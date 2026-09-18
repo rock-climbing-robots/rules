@@ -1,0 +1,49 @@
+# Build the rules PDF and attach it to the GitHub release.
+#
+# Publishing a release (e.g. tag "rev1") builds rulebook.tex with the release
+# tag as the rules revision (title page and footer), then uploads
+# rcr-rules-<tag>.pdf to that release. It can also be run manually from the
+# Actions tab; the PDF is then kept as a workflow artifact.
+name: Rules PDF
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write            # needed to upload the release asset
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: texlive/texlive:latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build rulebook.pdf
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          # The release tag overrides \rulesrev; manual runs keep the one in the source.
+          if [ -n "$TAG" ]; then PRE="\\def\\rulesrev{\\detokenize{$TAG}}"; else PRE=""; fi
+          for pass in 1 2; do
+            pdflatex -interaction=nonstopmode -halt-on-error -jobname=rulebook \
+              "${PRE}\\input{rulebook}"
+          done
+          cp rulebook.pdf "rcr-rules-${TAG:-dev}.pdf"
+
+      - name: Attach PDF to the release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: rcr-rules-${{ github.event.release.tag_name }}.pdf
+
+      - name: Keep PDF as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rules-pdf
+          path: rcr-rules-*.pdf
