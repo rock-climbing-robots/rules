@@ -3,3 +3,6 @@
 *.log
 *.out
 *.toc
+
+# PDFs are build outputs (the release workflow builds the rules PDF)
+*.pdf
