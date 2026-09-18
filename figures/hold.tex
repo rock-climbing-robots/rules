@@ -89,8 +89,14 @@
   \begin{scope}[shift={(13.0cm,-0.1cm)},
                 x={(\ax cm,\ay cm)},y={(\bx cm,\by cm)},z={(0cm,\cz cm)}]
     \fill[wood,draw=woodE] (-80,0,-80) -- (80,0,-80) -- (80,0,80) -- (-80,0,80) -- cycle;
-    \foreach \i in {-3,...,2}{\foreach \j in {-3,...,3}{
-        \fill[woodE!85!black] ({\i*25+12.5},0,{\j*25}) circle (2.0);}}
+    % A disc lying in the wall plane projects to a sheared ellipse spanned by the
+    % x and z vectors; TikZ's "circle" would instead use x and y, i.e. lay
+    % the hole flat in the horizontal plane. Redefining y as z inside the scope
+    % makes (u,v) mean u*x+v*z, so "circle" draws the right ellipse.
+    \begin{scope}[y={(0cm,\cz cm)}]
+      \foreach \i in {-3,...,2}{\foreach \j in {-3,...,3}{
+          \fill[woodE!85!black] ({\i*25+12.5},{\j*25}) circle (2.0);}}
+    \end{scope}
     \draw[acc,thick] plot[domain=0:360,samples=73,smooth] ({60*cos(\x)},0,{60*sin(\x)});
 
     % shaded hold mesh, painter-sorted
