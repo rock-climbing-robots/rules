@@ -11,11 +11,15 @@ Running this script rewrites the blocks between the GEN markers in hold.tex.
 import math, re, pathlib
 import numpy as np
 
-D = 72.0                                 # protrusion of the front face
-TOP = [(0, 36), (20, 28), (38, 27), (54, 33), (63, 38), (70, 35), (72, 31)]
-BOT = [(0, -34), (20, -32), (42, -24), (60, -14), (70, -8), (72, -6)]
+S = 0.58                                 # uniform scale of the jug design
+R_ENV = 30.0                             # envelope radius (cylinder, 60 mm)
+D = 72.0 * S                             # protrusion of the front face
+TOP = [(d*S, z*S) for d, z in
+       [(0, 36), (20, 28), (38, 27), (54, 33), (63, 38), (70, 35), (72, 31)]]
+BOT = [(d*S, z*S) for d, z in
+       [(0, -34), (20, -32), (42, -24), (60, -14), (70, -8), (72, -6)]]
 N_EXP = 2.6                              # super-ellipse exponent of sections
-W0, W1 = 45.0, 26.0                      # half-width at the wall / front face
+W0, W1 = 45.0 * S, 26.0 * S              # half-width at the wall / front face
 
 def catmull(points, n=24):
     p = [points[0]] + list(points) + [points[-1]]
@@ -52,6 +56,9 @@ L = np.array([-0.35, -0.55, 0.76]); L /= np.linalg.norm(L)   # light
 BASE = np.array([0, 150, 136])
 
 rings = [section(d) for d in np.linspace(0, D, 37)]
+r_max = max(math.hypot(p[0], p[2]) for r in rings for p in r)
+assert r_max < R_ENV, f"hold does not fit the envelope: r = {r_max:.1f} mm"
+print(f"max radius {r_max:.1f} mm, protrusion {D:.1f} mm")
 faces = []
 for r0, r1 in zip(rings, rings[1:]):
     n = len(r0)
@@ -79,8 +86,7 @@ for _, q, nrm in faces:
     mesh.append(f"    \\filldraw[fill={col},draw={col},line width=0.15pt] {path} -- cycle;")
 
 # ------------------------------------------------------ orthographic views
-side = [(d, z) for d, z in top] and \
-    [(p[0], p[1]) for p in top] + [(D, -6)] + [(p[0], p[1]) for p in bot[::-1]]
+side = [(p[0], p[1]) for p in top] + [(D, -6*S)] + [(p[0], p[1]) for p in bot[::-1]]
 side_path = " -- ".join(f"({f(x)},{f(z)})" for x, z in side) + " -- cycle"
 
 def outline(d):

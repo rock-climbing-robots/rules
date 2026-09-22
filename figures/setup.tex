@@ -82,8 +82,8 @@
   \fill[wood,draw=woodE,thick] (0,0,0) -- (8,0,0) -- (8,0,14) -- (0,0,14) -- cycle;
   \fill[woodE!45!wood] (8,0,0) -- (8,0.10,0) -- (8,0.10,14) -- (8,0,14) -- cycle;
   \begin{scope}[shift={(0,-0.01,0)},wallplane]
-    \foreach \i in {0,...,30}{\foreach \j in {0,...,54}{
-        \fill[woodE!80!black] ({0.25+\i*0.25},{0.25+\j*0.25}) circle (0.035);}}
+    \foreach \i in {0,...,52}{\foreach \j in {0,...,92}{
+        \fill[woodE!80!black] ({0.1+\i*0.15},{0.1+\j*0.15}) circle (0.024);}}
   \end{scope}
 
   \definecolor{holdA}{RGB}{0,150,136}\definecolor{holdB}{RGB}{247,181,56}
@@ -262,11 +262,11 @@
   \draw[lead] (Lrope.west) -- (Prope);
 
   \node[lab,anchor=west] (Lbot) at ($(Pbot)+(3.6cm,-0.5cm)$)
-        {Legged humanoid robot\\ $\le 4$ limbs, height $\le 400$\,mm\\ optional ArUco marker (ID 5)};
+        {Climbing robot\\ height $\le 400$\,mm\\ optional ArUco marker (ID 5)};
   \draw[lead] (Lbot.west) -- (Pbot);
 
   \node[lab,anchor=west] (Lwall) at ($(6.5,0,4.0)+(3.0cm,-0.6cm)$)
-        {Climbing wall\\ $1400\times800\times10$\,mm\\ M4 grid, pitch $25$\,mm};
+        {Climbing wall\\ $1400\times800\times10$\,mm\\ M3 grid, pitch $15$\,mm};
   \draw[lead] (Lwall.west) -- (6.5,0,4.0);
 
   \node[lab,anchor=west] (Lar) at ($(7.6,-0.03,0.8)+(1.3cm,-0.9cm)$)

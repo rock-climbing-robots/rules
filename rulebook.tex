@@ -6,7 +6,7 @@
 \usepackage{microtype}
 \usepackage[skip=5pt plus 1pt]{parskip}
 \usepackage[margin=25mm]{geometry}
-\usepackage{xcolor}
+\usepackage[table]{xcolor}
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
 \usepackage{booktabs}
@@ -15,7 +15,8 @@
 \usepackage{titlesec}
 \usepackage{tcolorbox}
 \usepackage[normalem]{ulem}
-\usepackage{standalone}
+% prebuilt figures/*.pdf when present (see Makefile), else compiled inline
+\usepackage[mode=image|tex]{standalone}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,calc,positioning,decorations.pathmorphing}
 \usepackage[hidelinks]{hyperref}
@@ -44,6 +45,10 @@
 \ifreview\else\renewenvironment{changed}{}{}\fi
 %% deleted text: shown struck through while under review, gone otherwise
 \newcommand{\del}[1]{\ifreview\begin{changed}\textcolor{black!55}{\sout{#1}}\end{changed}\fi}
+%% changed inline words
+\newcommand{\chg}[1]{\ifreview\colorbox{chg}{#1}\else#1\fi}
+%% changed table row
+\newcommand{\chgrow}{\ifreview\rowcolor{chg}\fi}
 %% changed figure: yellow frame
 \newcommand{\chgfig}[1]{\ifreview{\setlength{\fboxrule}{2.5pt}%
   \fcolorbox{chg}{white}{#1}}\else#1\fi}
@@ -111,7 +116,7 @@ of the wall, exactly as a human climber would be.
 \noindent\textbf{Website:} \url{https://rock-climbing-robots.github.io/}
 \medskip
 
-The event combines mechanical design (limbs, grippers, harness), control
+The event combines mechanical design (limbs, grippers, anchor point), control
 (balance and contact planning on a sparse set of holds) and perception (two
 external cameras observe the wall).
 
@@ -128,16 +133,14 @@ external cameras observe the wall).
 
 \subsection{Morphology}
 
-The robot must be \emph{legged}: it climbs using its articulated limbs. Other
-parts of the robot, such as its trunk, may also touch the wall and the holds.
+The robot climbs using its \emph{limbs}; its shape is otherwise not
+constrained. Other parts of the robot, such as its trunk, may also touch the
+wall and the holds.
 
-The robot must have a \emph{humanoid-type body}: a central trunk carrying
-two upper limbs and two lower limbs.
-
-Whether a robot is indeed humanoid is left to the discretion of the
-organisers.
-
-A robot must have \textbf{no more than four limbs}.
+A \emph{humanoid} robot has \textbf{four limbs}: a central trunk carrying two
+upper limbs and two lower limbs. Whether a robot is humanoid is left to the
+discretion of the organisers. Non-humanoid robots are allowed, with a time
+factor (Section~\ref{sec:scoring}).
 
 Attachment to the wall must be made through the holds.
 
@@ -163,7 +166,7 @@ A robot may be powered either:
 \end{enumerate}
 
 A tethered cable must be attached to the safety rope and must never be
-load-bearing: it shall not be able to hold the robot if the harness fails, and
+load-bearing: it shall not be able to hold the robot if the anchor point fails, and
 it shall not be used to help the robot climb.
 
 \subsection{Control and autonomy}
@@ -219,10 +222,14 @@ allowed on the provided robots.
 \section{Climbing wall}
 \label{sec:wall}
 
-\textbf{Four walls} are provided by the organisers, one for each
-\textbf{difficulty level, from 1 to 4}. The difficulty comes from the holds set
-on the wall: sparsity of the holds, paths that are not climbable and must be
-discarded by the planner, etc.
+\textbf{Four walls} are provided by the organisers. The boards are identical:
+the difficulty comes from the configuration of the holds, which are
+reconfigured during the event. There are \textbf{three difficulty levels}:
+\begin{itemize}
+  \item \textbf{Level 1} --- a ``ladder'': regularly spaced holds;
+  \item \textbf{Level 2} --- a ladder with missing holds;
+  \item \textbf{Level 3} --- the robot needs to move to the right or to the left.
+\end{itemize}
 
 Each climbing wall is a flat rectangular board, mounted vertically, of
 \textbf{1400\,mm} height and \textbf{800\,mm} width.
@@ -230,8 +237,8 @@ Each climbing wall is a flat rectangular board, mounted vertically, of
 The board is made of a \textbf{sturdy material} (for example MDF or CTM), with
 a thickness of \textbf{10\,mm}, mounted on a rigid frame.
 
-The board is drilled with a regular square grid of \textbf{M4} holes with
-a pitch of \textbf{25\,mm}. The border margin is 25\,mm on all four sides.
+The board is drilled with a regular square grid of \textbf{M3} holes with
+a pitch of \textbf{15\,mm}. The border margin is 10\,mm on all four sides.
 Holes are plain through-holes: holds are bolted from the front and
 tightened by nuts on the rear side of the board.
 
@@ -245,7 +252,6 @@ tightened by nuts on the rear side of the board.
 
 \begin{openpoint}[To be confirmed --- wall]
 \begin{itemize}
-  \item Board inclination: strictly vertical, or slightly overhanging?
   \item Surface finish (raw, painted, varnished) --- this changes friction
         significantly.
 \end{itemize}
@@ -261,11 +267,11 @@ provided by the organisers.
 Teams may come with \textbf{their own holds}, or adapt the provided ones, as
 long as they remain compatible with the wall format (Figure~\ref{fig:hold}):
 \begin{itemize}
-  \item a hold is fixed with \textbf{two M4 bolts}, on \textbf{two holes side
-        by side horizontally} on the grid, i.e.\ \textbf{25\,mm apart}; the bolts go through the hold
+  \item a hold is fixed with \textbf{two M3 bolts}, on \textbf{two holes side
+        by side horizontally} on the grid, i.e.\ \textbf{15\,mm apart}; the bolts go through the hold
         and the board, and are tightened by \textbf{nuts on the opposite side
         of the wall};
-  \item a hold must fit inside a \textbf{cylinder of radius 60\,mm and length
+  \item a hold must fit inside a \textbf{cylinder of diameter 60\,mm (radius 30\,mm) and length
         100\,mm}, whose axis is normal to the wall and centred between the two
         bolts.
 \end{itemize}
@@ -273,9 +279,9 @@ long as they remain compatible with the wall format (Figure~\ref{fig:hold}):
 \begin{figure}[h!]
   \centering
   \includestandalone[width=0.97\textwidth]{figures/hold}
-  \caption{Hold specification: two M4 bolts on horizontally adjacent grid holes, passing
+  \caption{Hold specification: two M3 bolts on horizontally adjacent grid holes, passing
            through the hold and the board and tightened by nuts on the rear of
-           the wall, and the cylindrical envelope ($R=60$\,mm, $L=100$\,mm) the
+           the wall, and the cylindrical envelope ($\varnothing=60$\,mm, $L=100$\,mm) the
            hold must fit in. All dimensions in millimetres.}
   \label{fig:hold}
 \end{figure}
@@ -357,30 +363,15 @@ All markers belong to the ArUco dictionary \textbf{\texttt{DICT\_4X4\_50}}.
   \label{fig:aruco}
 \end{figure}
 
-\subsection{Safety rope}
-
-A safety rope is provided for every robot.
-It runs over a pulley hung from a \textbf{crossbeam joining the two uprights of
-the wall frame}, above the top of the wall.
-Its use is \textbf{mandatory} for any run on the wall.
-
-\textbf{The rope is handled by the team itself.} No belay or tether
-management device is provided: a team member is responsible for handling the
-rope during the whole run, so that the robot is caught before it reaches the
-ground.
-
-The rope must be kept slack enough not to assist the robot, and tight
-enough to limit the fall. 
-
 \subsection{Tether: Ethernet and power}
 
 Ethernet and power cables may be attached along the safety rope. They must
 follow the rope and must not be routed to a separate anchor point.
 
 Cable strain relief must be provided on the robot side so that a fall
-loads the harness, never the connectors.
+loads the anchor point, never the connectors.
 
-\subsection{Harness}
+\subsection{Anchor point}
 
 Each team must provide on its robot an \textbf{anchor point for the safety
 rope}.
@@ -437,8 +428,8 @@ based on \textbf{MuJoCo (CPU)} and includes the models of the \textbf{robot},
 the \textbf{walls} and the \textbf{holds}.
 
 \begin{itemize}
-  \item The simulated competition uses walls of the \textbf{same four
-        difficulty levels} as the real one.
+  \item The simulated competition uses walls of the \textbf{same
+        three difficulty levels} as the real one.
   \item \textbf{Perception is simulated by MuJoCo}: the robot relies on the
         camera images rendered by the simulator. The two perception modes of
         Section~\ref{sec:perception} (with ArUco markers, markerless) apply in
@@ -461,7 +452,7 @@ official evaluation.
 
 There are \textbf{two completely independent evaluations}, each with its own
 ranking: \textbf{in simulation} and \textbf{on the real robot}. Both use walls
-of four difficulty levels. The goal is to \textbf{climb the wall in the
+of three difficulty levels. The goal is to \textbf{climb the wall in the
 shortest time}.
 
 \textbf{Start of a run.} The robot is either placed \emph{on the ground},
@@ -485,8 +476,7 @@ of the \textbf{highest holds}.
 \toprule
 \textbf{Condition} & \textbf{Time factor}\\
 \midrule
-Wall difficulty level 4 & \tf{tfA}{1}\\
-Wall difficulty level 3 & \tf{tfB}{1.1}\\
+Wall difficulty level 3 & \tf{tfA}{1}\\
 Wall difficulty level 2 & \tf{tfC}{1.25}\\
 Wall difficulty level 1 & \tf{tfD}{1.5}\\
 \midrule
@@ -495,13 +485,16 @@ Start at the bottom of the wall                         & \tf{tfB}{1.1}\\
 \midrule
 Markerless perception                                   & \tf{tfA}{1}\\
 Perception using ArUco markers                          & \tf{tfC}{1.25}\\
+\midrule
+Humanoid robot                                  & \tf{tfA}{1}\\
+Non-humanoid robot                              & \tf{tfB}{1.1}\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Factors multiply: for instance, a run on a level-3 wall, starting at the bottom
+Factors multiply: for instance, a run on a level-2 wall, starting at the bottom
 of the wall and using markers, has its time multiplied by
-$1.1\times1.1\times1.25=1.5125$.
+$1.25\times1.1\times1.25=1.71875$.
 
 \textbf{Timer.} If the robot starts on the ground and gets onto the wall by
 itself, the timer \textbf{starts when its contact with the ground is broken};

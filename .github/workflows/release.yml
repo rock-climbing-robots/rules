@@ -30,6 +30,10 @@ jobs:
         run: |
           # The release tag overrides \rulesrev; manual runs keep the one in the source.
           if [ -n "$TAG" ]; then PRE="\\def\\rulesrev{\\detokenize{$TAG}}"; else PRE=""; fi
+          # Figures are prebuilt: inlining them all exceeds TeX's main memory.
+          for f in figures/*.tex; do
+            pdflatex -interaction=nonstopmode -halt-on-error -output-directory=figures "$f"
+          done
           for pass in 1 2; do
             pdflatex -interaction=nonstopmode -halt-on-error -jobname=rulebook \
               "${PRE}\\input{rulebook}"
