@@ -85,21 +85,14 @@
 \fancypagestyle{plain}{\fancyhf{}\fancyfoot[L]{\small\textcolor{black!55}{Rock Climbing Robots --- Rules \rulesrev}}\fancyfoot[R]{\small\thepage}}
 
 \title{\vspace{-12mm}\textbf{Rock Climbing Robots}\\[2mm]
-       \large Hackathon Rulebook --- \emph{Draft}}
+       \large Hackathon Rulebook\\[4mm]
+       \normalsize Rules revision \textbf{\rulesrev} --- \today}
 \author{}
-\date{Rules revision \textbf{\rulesrev} --- \today}
+\date{}
 
 \begin{document}
 \maketitle
 \vspace{-8mm}
-
-\begin{center}
-\begin{tcolorbox}[colback=rcrorange!5,colframe=rcrorange!60,boxrule=0.6pt,arc=2pt,
-                  width=0.92\textwidth,left=6pt,right=6pt,top=4pt,bottom=4pt]
-\small\textbf{Draft document.} Every item marked \tbd{\dots} or listed in an
-\emph{Open point} box still has to be decided before the rules are frozen.
-\end{tcolorbox}
-\end{center}
 
 \tableofcontents
 \bigskip
@@ -211,13 +204,6 @@ Repository         & \url{https://github.com/Rhoban/microban}\\
   \label{fig:microban}
 \end{figure}
 
-\begin{openpoint}[To be specified --- provided robot]
-Quantity available, on-board computer and SDK, allocation of the 19th servo
-(6\,DOF $\times$ 2 legs $+$ 3\,DOF $\times$ 2 arms $= 18$; the remaining one is
-presumably the trunk or the head), and which mechanical modifications are
-allowed on the provided robots.
-\end{openpoint}
-
 %% ================================================================
 \section{Climbing wall}
 \label{sec:wall}
@@ -234,8 +220,8 @@ reconfigured during the event. There are \textbf{three difficulty levels}:
 Each climbing wall is a flat rectangular board, mounted vertically, of
 \textbf{1400\,mm} height and \textbf{800\,mm} width.
 
-The board is made of a \textbf{sturdy material} (for example MDF or CTM), with
-a thickness of \textbf{10\,mm}, mounted on a rigid frame.
+The board is made of \textbf{plywood}, with a thickness of \textbf{10\,mm},
+mounted on a rigid frame.
 
 The board is drilled with a regular square grid of \textbf{M3} holes with
 a pitch of \textbf{15\,mm}. The border margin is 10\,mm on all four sides.
@@ -249,13 +235,6 @@ tightened by nuts on the rear side of the board.
            millimetres. Hole positions are shown enlarged for readability.}
   \label{fig:wall}
 \end{figure}
-
-\begin{openpoint}[To be confirmed --- wall]
-\begin{itemize}
-  \item Surface finish (raw, painted, varnished) --- this changes friction
-        significantly.
-\end{itemize}
-\end{openpoint}
 
 %% ================================================================
 \section{Holds}
@@ -425,7 +404,11 @@ In addition to the real robot, teams are evaluated in simulation, using the
 
 \textbf{A simulator will be provided by the organisers} at a later date. It is
 based on \textbf{MuJoCo (CPU)} and includes the models of the \textbf{robot},
-the \textbf{walls} and the \textbf{holds}.
+the \textbf{walls} and the \textbf{holds}. It will be available at:
+
+\medskip
+\noindent\url{https://github.com/rock-climbing-robots/simulator}
+\medskip
 
 \begin{itemize}
   \item The simulated competition uses walls of the \textbf{same
@@ -437,14 +420,6 @@ the \textbf{walls} and the \textbf{holds}.
   \item Runs in simulation are ranked with the same rules as on the real
         robot (Section~\ref{sec:scoring}).
 \end{itemize}
-
-\begin{openpoint}[To be specified --- simulation]
-
-Release date of the simulator; simulated cameras (placement, resolution,
-rendering of the ArUco markers, displacement of the cameras for markerless
-runs); how and on which hardware the simulated runs are executed for the
-official evaluation.
-\end{openpoint}
 
 %% ================================================================
 \section{Evaluation and scoring}
