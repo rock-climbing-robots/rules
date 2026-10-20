@@ -3,6 +3,7 @@
 \usetikzlibrary{arrows.meta,calc,positioning}
 
 \begin{document}
+\graphicspath{{figures/}{./}}
 \begin{tikzpicture}[
     x={(0.50cm,-0.29cm)}, y={(0.50cm,0.29cm)}, z={(0cm,0.57cm)}, % 1 unit = 100 mm
     >={Stealth[length=5pt,width=4pt]},
@@ -20,6 +21,9 @@
   \definecolor{cam}{RGB}{60,60,68}
   \definecolor{bot}{RGB}{40,48,60}
   \definecolor{human}{RGB}{203,208,214}
+  \definecolor{woodP}{RGB}{236,224,203}
+  \definecolor{hold}{RGB}{46,170,80}
+  \definecolor{printed}{RGB}{46,46,52}
 
   % isometric box: x y z dx dy dz color
   \newcommand{\isobox}[7]{%
@@ -62,103 +66,85 @@
   \foreach \i in {-5,-4,...,13}{\draw[black!10,thin] (\i,-15,0) -- (\i,2.2,0);}
   \foreach \j in {-15,-14,...,2}{\draw[black!10,thin] (-5.6,\j,0) -- (13.8,\j,0);}
 
-  %% ================= wall support frame (behind) =================
-  % The mid-height brace spans the whole frame, so its lit top face used to cut
-  % across both posts and make them look severed. Drawing it first lets the two
-  % posts paint over it and read as single uprights; the brace itself stays
-  % hidden behind the wall panel, which is exactly where it sits.
-  % Painter order runs from the far side to the near side. The viewer is on the
-  % +x, -y side, so smaller x is further away: brace, then left upright, then
-  % right upright. The crossbeam rests on top of both uprights and is drawn last,
-  % which is also the only order that gets the joints right -- a crossbeam butted
-  % between the uprights would have to be drawn after the left one and before the
-  % right one, and its end grain would show.
-  \isobox{-0.45}{0.1}{6.8}{8.9}{0.45}{0.45}{woodD}%  mid-height brace
-  \isobox{-0.45}{0.1}{0}{0.45}{0.45}{16.3}{woodD}%   left upright
-  \isobox{8.0}{0.1}{0}{0.45}{0.45}{16.3}{woodD}%     right upright
-  \isobox{-0.45}{0.1}{16.3}{8.9}{0.45}{0.45}{woodD}% crossbeam, sitting on both
+  %% ================= base plate =================
+  \isobox{-2.2}{-5.0}{-0.15}{12.4}{6.6}{0.15}{woodP}
+
+  %% ================= frame, board, feet =================
+  % As built: two square uprights stand beside the 800 mm board, flush with its
+  % face; each slides into a 3D-printed sleeve foot screwed to a plywood base
+  % plate, which holds it upright, and a crossbeam sits on both uprights.
+  % Painter order runs from the far side to the near side (the viewer is on the
+  % +x, -y side): left foot, left upright rising out of it, board and everything
+  % on it, right foot, right upright, then the crossbeam on both uprights. Each
+  % upright is drawn from the top of its sleeve only, after the sleeve, so it
+  % reads as coming out of it.
+  \newcommand{\foot}[1]{% sleeve foot around an upright, #1 = left x of the sleeve
+    \isobox{#1-0.2}{-0.4}{0}{1.35}{1.7}{0.1}{printed}%
+    \isobox{#1}{-0.2}{0.1}{0.95}{1.3}{2.5}{printed}}
+  \foot{-0.95}
+  \isobox{-0.75}{0}{2.6}{0.75}{0.9}{14.4}{woodD}%   left upright
 
   %% ================= climbing wall =================
   \fill[wood,draw=woodE,thick] (0,0,0) -- (8,0,0) -- (8,0,14) -- (0,0,14) -- cycle;
-  \fill[woodE!45!wood] (8,0,0) -- (8,0.10,0) -- (8,0.10,14) -- (8,0,14) -- cycle;
+  % 52 x 93 holes, 15 mm pitch: 17.5 mm side margins, 10 mm top and bottom
   \begin{scope}[shift={(0,-0.01,0)},wallplane]
-    \foreach \i in {0,...,52}{\foreach \j in {0,...,92}{
-        \fill[woodE!80!black] ({0.1+\i*0.15},{0.1+\j*0.15}) circle (0.024);}}
+    \foreach \i in {0,...,51}{\foreach \j in {0,...,92}{
+        \fill[woodE!80!black] ({0.175+\i*0.15},{0.1+\j*0.15}) circle (0.024);}}
   \end{scope}
 
-  \definecolor{holdA}{RGB}{0,150,136}\definecolor{holdB}{RGB}{247,181,56}
-  % \hold{colour}{x}{z}: a jug seen in projection. Stacked wall-plane shells,
-  % each one smaller, further out of the wall and lighter; because -y projects
-  % down and to the left, the stack naturally leans that way and reads as a dome
-  % rather than as a flat coloured disc.
-  \newcommand{\hold}[3]{%
-    \colorlet{hrim}{#1!62!black}\colorlet{htip}{#1!78!white}%
-    \foreach \k in {0,...,8}{%
-      \pgfmathsetmacro{\t}{\k/8}%
-      \pgfmathsetmacro{\hr}{0.31*(1-0.45*\t*\t)}%
-      \pgfmathsetmacro{\hy}{-0.04-0.40*\t}%
-      \pgfmathsetmacro{\hm}{100-100*\t}%
-      \wdisc{hrim!\hm!htip}{#2}{\hy}{#3}{\hr}}}
-  \foreach \hx/\hz/\hc in {3.25/9.25/holdA, 4.75/9.25/holdA, 3.25/5.75/holdB,
-      4.75/5.75/holdB, 2.25/3.25/holdA, 6.25/3.75/holdB, 1.25/7.75/holdB,
-      6.75/7.25/holdA, 2.25/11.75/holdB, 5.75/12.25/holdA, 4.25/1.75/holdA}
-     {\hold{\hc}{\hx}{\hz}}
+  % \realhold{x}{z}: the real hold (hold.stl) bolted on two holes 30 mm apart,
+  % bolt axis at (x,z), drawn as wall-plane sections from the wall outwards.
+  % GEN HOLD BEGIN
+  \newcommand{\realhold}[2]{\begin{scope}[shift={(#1,0,#2)}]%
+    \node[anchor=south west,inner sep=0pt] at (-0.2505cm,-0.2756cm) {\includegraphics[width=0.3520cm]{hold_setup.png}};%
+  \end{scope}}
+  % GEN HOLD END
+  % GEN SCENE HOLDS BEGIN
+  % route N3, seed 0: the holds are in the robot render below
+  \coordinate (Pattach) at (3.457,-1.666,7.022);% rope anchor on the trunk
+  \coordinate (Pbot) at (3.345,-1.287,6.289);
+  % GEN SCENE HOLDS END
 
   % ArUco markers at the four corners
   \arucoW{0}{14-\AT}{\arucoA} \arucoW{8-\AT}{14-\AT}{\arucoB}
   \arucoW{0}{0}{\arucoC}      \arucoW{8-\AT}{0}{\arucoD}
 
-  %% ============ pulley, hung off the crossbeam over the top of the wall ========
-  % A short bracket is cantilevered forward from the middle of the crossbeam so
-  % that the pulley, and therefore both strands of the rope, hang clear of the
-  % wall face. The wheel turns in a plane normal to the wall, i.e. x = 4.
-  \isobox{3.75}{-0.85}{16.3}{0.5}{0.95}{0.45}{woodD}
-  \wdisc{steel!50!black}{3.87}{-0.86}{16.42}{0.06}
-  \wdisc{steel!50!black}{4.13}{-0.86}{16.42}{0.06}
-  \fill[steel!55!black] (4.0,-0.49,16.32) -- (4.0,-0.35,16.32)
-                      -- (4.0,-0.35,15.62) -- (4.0,-0.49,15.62) -- cycle;% hanger
-  \fill[steel!60!black] plot[domain=0:360,samples=37,smooth] (4.0,{-0.42+0.36*cos(\x)},{15.62+0.36*sin(\x)});
-  \fill[steel!25!white] plot[domain=0:360,samples=37,smooth] (4.0,{-0.42+0.17*cos(\x)},{15.62+0.17*sin(\x)});
-  \coordinate (Ppulley) at (4.0,-0.85,16.30);
+  \foot{8.0}
+  \isobox{8.0}{0}{2.6}{0.75}{0.9}{14.4}{woodD}%     right upright
+  \isobox{-0.75}{0}{17.0}{9.5}{0.9}{0.7}{woodD}%    crossbeam, on both uprights
+
+  %% ============ rope ring, hung off an arm over the top of the wall ========
+  % A short arm rests on the middle of the crossbeam and reaches forward, so
+  % that the ring, and therefore both strands of the rope, hang clear of the
+  % wall face. A printed clamp on its end carries the ring, which hangs in a
+  % plane parallel to the wall.
+  \isobox{3.65}{-1.6}{17.7}{0.7}{2.5}{0.7}{woodD}%  arm
+  \isobox{3.55}{-1.85}{17.6}{0.9}{0.6}{0.9}{printed}% printed clamp
+  \begin{scope}[shift={(0,-1.55,0)},wallplane]
+    \draw[black!85,line width=2.6pt] (4.0,17.18) circle (0.34);
+  \end{scope}
+  \coordinate (Ppulley) at (4.0,-1.55,17.4);
 
   %% ================= rope + tether (drawn behind the robot) ==========
-  % rope over the top of the wheel, then down each vertical tangent
-  \draw[rope,line width=1.1pt] plot[domain=0:180,samples=25,smooth]
-        (4.0,{-0.42+0.36*cos(\x)},{15.62+0.36*sin(\x)});
-  \draw[rope,line width=1.1pt] (4.00,-0.06,15.62) .. controls (4.0,-0.20,12.6) .. (4.00,-0.43,8.60);
+  % rope through the ring, then down to the robot
+  \draw[rope,line width=1.1pt] (3.98,-1.55,17.5) .. controls (3.9,-1.6,12.8) .. (Pattach);
   \draw[acc,line width=0.85pt,densely dashed]
-        (4.10,-0.12,15.35) .. controls (4.14,-0.3,12.4) .. (4.12,-0.55,8.45);
-  % cable ties along the rope, from (4.02,-0.18,15.3) to (4.05,-0.45,9.0)
+        (4.10,-1.45,16.9) .. controls (4.0,-1.5,12.8) .. ($(Pattach)+(0.1,0,-0.1)$);
+  % cable ties along the rope
   \foreach \t in {0.3,0.55,0.8}
-     {\wdisc{black!45}{4.02+\t*0.03}{-0.18-\t*0.27}{15.3-\t*6.3}{0.07}}
-  \coordinate (Prope) at (4.04,-0.3,12.4);
+     {\fill[black!45] ($(4.02,-1.5,16.4)!\t!(Pattach)$) circle (1.3pt);}
+  \coordinate (Prope) at ($(4.02,-1.5,16.4)!0.45!(Pattach)$);
 
   %% ================= robot =================
-  \begin{scope}[shift={(3.25,-0.55,5.75)}]
-    \draw[bot,line width=1.7pt] (0.30,0,1.40) -- (0.05,0,0.15);
-    \draw[bot,line width=1.7pt] (1.20,0,1.40) -- (1.45,0,0.15);
-    \fill[bot] (0.30,0,1.40) -- (1.20,0,1.40) -- (1.20,0,2.75) -- (0.30,0,2.75) -- cycle;
-    \fill[bot] (0.48,0,2.80) -- (1.02,0,2.80) -- (1.02,0,3.28) -- (0.48,0,3.28) -- cycle;
-    % optional ArUco marker on the robot (ID 5)
-    \fill[white] (0.35,-0.04,1.55) -- ++(0.80,0,0) -- ++(0,0,0.80) -- ++(-0.80,0,0) -- cycle;
-    \fill[black] (0.45,-0.05,1.65) -- ++(0.60,0,0) -- ++(0,0,0.60) -- ++(-0.60,0,0) -- cycle;
-    \foreach \c/\r in \arucoE{
-      \fill[white] ({0.45+0.1*\c},-0.06,{1.65+0.1*\r})
-        -- ++(0.1,0,0) -- ++(0,0,0.1) -- ++(-0.1,0,0) -- cycle;}
-    \draw[bot,line width=1.7pt] (0.35,0,2.65) -- (0.00,0,3.50);
-    \draw[bot,line width=1.7pt] (1.15,0,2.65) -- (1.50,0,3.50);
-    \begin{scope}[wallplane]
-      \fill[acc] (0,3.50) circle (0.12) (1.5,3.50) circle (0.12);
-      \fill[acc] (0.05,0.15) circle (0.12) (1.45,0.15) circle (0.12);
-    \end{scope}
-    \coordinate (Pbot)   at (0.75,0,2.4);
-    \coordinate (Parbot) at (0.75,0,1.60);
-  \end{scope}
+  % GEN SCENE ROBOT BEGIN
+  % MicroClimbingBan in stance 26 of route N3, with the holds around it
+  \node[anchor=south west,inner sep=0pt] at (0.5027cm,-1.2771cm) {\includegraphics[width=2.1640cm]{climber_setup.png}};
+  % GEN SCENE ROBOT END
 
   %% ================= free rope end + team member =================
   \def\PX{-2.0}\def\PY{-6.0}
   \draw[rope!85,line width=1.1pt]
-       (4.00,-0.78,15.62) .. controls (3.2,-2.6,14.4) and (1.2,-5.0,10.2)
+       (4.02,-1.58,17.5) .. controls (3.2,-3.0,15.4) and (1.2,-5.0,10.2)
        .. ({\PX+3.05},\PY,7.75);
   \begin{scope}[shift={(\PX,\PY,0)}]
     % legs
@@ -253,8 +239,8 @@
   \draw[cam,thin] (12.6,-10.6,6.9) .. controls (13.6,-14.6,0.3) .. (12.8,-13.3,0.10);
 
   %% ================= annotations =================
-  \node[lab,anchor=south west] (Lpul) at ($(Ppulley)+(0.9cm,0.35cm)$)
-        {Crossbeam joining the uprights,\\ with the pulley hung in front};
+  \node[lab,anchor=south west] (Lpul) at ($(Ppulley)+(1.4cm,0.45cm)$)
+        {Crossbeam on the uprights;\\ rope ring hung in front on a short arm};
   \draw[lead] (Lpul.south west) -- (Ppulley);
 
   \node[lab,anchor=west] (Lrope) at ($(Prope)+(3.3cm,1.1cm)$)
@@ -266,8 +252,12 @@
   \draw[lead] (Lbot.west) -- (Pbot);
 
   \node[lab,anchor=west] (Lwall) at ($(6.5,0,4.0)+(3.0cm,-0.6cm)$)
-        {Climbing wall\\ $1400\times800\times10$\,mm\\ M3 grid, pitch $15$\,mm};
+        {Climbing wall\\ $1400\times800\times10$\,mm\\ M3 grid, pitch $15$\,mm,\\ $52\times93$ holes};
   \draw[lead] (Lwall.west) -- (6.5,0,4.0);
+
+  \node[lab,anchor=west] (Lfoot) at ($(8.85,0.3,1.4)+(2.6cm,0.1cm)$)
+        {Uprights slid into printed\\ feet on a base plate};
+  \draw[lead] (Lfoot.west) -- (8.85,0.3,1.4);
 
   \node[lab,anchor=west] (Lar) at ($(7.6,-0.03,0.8)+(1.3cm,-0.9cm)$)
         {ArUco markers IDs 1--4\\ on the four corners};

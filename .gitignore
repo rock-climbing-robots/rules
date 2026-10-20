@@ -6,3 +6,8 @@
 
 # PDFs are build outputs (the release workflow builds the rules PDF)
 *.pdf
+
+# Python / latexmk byproducts
+__pycache__/
+*.fls
+*.fdb_latexmk

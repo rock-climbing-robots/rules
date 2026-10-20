@@ -1,108 +1,234 @@
 #!/usr/bin/env python3
-"""Generate the hold geometry used by figures/hold.tex.
+"""Generate figures/hold.tex from the real hold mesh, figures/hold.stl.
 
-The hold is a jug: a body tapering away from the wall, whose top is recessed
-(the notch / incut) behind a raised lip, ending on a flat front face where the
-two counterbored bolt holes open.  Coordinates are in mm; d is the distance
-from the wall, z the height, x the horizontal position along the wall.
+hold.stl is meshed from the CAD file (assets/hold.step) with gmsh:
+curvature-based sizing, 1.5 mm max edge, ~20k triangles.
 
-Running this script rewrites the blocks between the GEN markers in hold.tex.
+The mesh is the hold the robot is designed and trained for: a bucket whose
+spherical socket takes the robot's ball end, on a 3 mm back plate bolted
+through two grid holes.  Mesh frame (metres or mm): origin at the socket
+centre, +y towards the wall, back face at y = +26 mm, bolt holes at
+x = +-15 mm, z = +14 mm.
+
+Figure frame (mm): X along the wall, Y = y - 26 (wall face at Y = 0, the hold
+at Y < 0), Z = z - 14 (bolt axis at Z = 0, socket centre at Z = -14).
+
+    python3 figures/gen_hold.py   # rewrites hold.tex and setup.tex's GEN HOLD block
+The shaded views are rendered with a depth buffer into PNGs (hold_front.png,
+hold_iso.png, hold_setup.png) that the figures include: painting triangles
+far-to-near gets the bowl and the gussets wrong.  Needs numpy, trimesh,
+matplotlib.
 """
-import math, re, pathlib
+import pathlib
+import re
 import numpy as np
+import trimesh
+from raster import render
 
-S = 0.58                                 # uniform scale of the jug design
-R_ENV = 30.0                             # envelope radius (cylinder, 60 mm)
-D = 72.0 * S                             # protrusion of the front face
-TOP = [(d*S, z*S) for d, z in
-       [(0, 36), (20, 28), (38, 27), (54, 33), (63, 38), (70, 35), (72, 31)]]
-BOT = [(d*S, z*S) for d, z in
-       [(0, -34), (20, -32), (42, -24), (60, -14), (70, -8), (72, -6)]]
-N_EXP = 2.6                              # super-ellipse exponent of sections
-W0, W1 = 45.0 * S, 26.0 * S              # half-width at the wall / front face
+HERE = pathlib.Path(__file__).parent
+PLATE_Y, HOLE_DZ = 26.0, 14.0
+R_ENV, L_ENV = 30.0, 100.0
+BASE = np.array([46, 170, 80])
+AX, AY, BX, BY, CZ = 0.0384, -0.0128, 0.0256, 0.016, 0.0416
 
-def catmull(points, n=24):
-    p = [points[0]] + list(points) + [points[-1]]
-    out = []
-    for i in range(1, len(p) - 2):
-        p0, p1, p2, p3 = map(np.array, (p[i-1], p[i], p[i+1], p[i+2]))
-        for t in np.linspace(0, 1, n, endpoint=False):
-            out.append(0.5 * ((2*p1) + (-p0+p2)*t + (2*p0-5*p1+4*p2-p3)*t*t
-                              + (-p0+3*p1-3*p2+p3)*t**3))
-    out.append(np.array(points[-1], float))
-    return np.array(out)
+mesh = trimesh.load(HERE / "hold.stl", force="mesh")
+if mesh.extents.max() < 1.0:
+    mesh.apply_scale(1000.0)
+v = mesh.vertices.copy()
+v[:, 1] -= PLATE_Y
+v[:, 2] -= HOLE_DZ
+mesh = trimesh.Trimesh(v, mesh.faces, process=False)
+lo, hi = mesh.bounds
+assert abs(hi[1]) < 0.05, "back face of the hold is not at y = +26 mm"
+# hold.tex can show the hold UP mm above the envelope axis (0: centred between
+# the bolts, as the rules say; the 2026-10-13 hold is cut flat at z = -15 for it)
+UP = 0.0
+mesh_up = mesh.copy()
+mesh_up.apply_translation([0.0, 0.0, UP])
+r_max = np.hypot(mesh_up.vertices[:, 0], mesh_up.vertices[:, 2]).max()
+if r_max > R_ENV or -lo[1] > L_ENV:
+    print(f"WARNING: hold outside the envelope (radius {r_max:.1f} > {R_ENV} mm)")
 
-top, bot = catmull(TOP), catmull(BOT)
-zt = lambda d: np.interp(d, top[:, 0], top[:, 1])
-zb = lambda d: np.interp(d, bot[:, 0], bot[:, 1])
-w  = lambda d: W0 - (W0 - W1) * (d / D) ** 1.3
 
-def section(d, n_ang=40):
-    zc, h, hw = (zt(d) + zb(d)) / 2, (zt(d) - zb(d)) / 2, w(d)
-    pts = []
-    for k in range(n_ang):
-        a = 2 * math.pi * k / n_ang
-        c, s = math.cos(a), math.sin(a)
-        x = hw * math.copysign(abs(c) ** (2 / N_EXP), c)
-        z = zc + h * math.copysign(abs(s) ** (2 / N_EXP), s)
-        pts.append((x, -d, z))           # world: y < 0 is out of the wall
-    return pts
+def f(x):
+    s = f"{x:.2f}".rstrip("0").rstrip(".")
+    return "0" if s in ("-0", "") else s
 
-f = lambda v: f"{v:.2f}".rstrip('0').rstrip('.')
 
-# ---------------------------------------------------------------- iso mesh
-V = np.array([0.667, -1.0, 0.590]); V /= np.linalg.norm(V)   # toward viewer
-L = np.array([-0.35, -0.55, 0.76]); L /= np.linalg.norm(L)   # light
-BASE = np.array([0, 150, 136])
+view_iso = np.array([BX * CZ, -AX * CZ, AX * BY - BX * AY])
+view_iso /= np.linalg.norm(view_iso)
+front = render(mesh_up, np.array([[0.04, 0, 0], [0, 0, 0.04]]), np.array([0.0, -1.0, 0.0]),
+               HERE / "hold_front.png", ppc=300, face_rgb=BASE)
+iso = render(mesh_up, np.array([[AX, BX, 0], [AY, BY, CZ]]), view_iso, HERE / "hold_iso.png",
+             ppc=300, face_rgb=BASE)
+P_SET = np.array([[0.5, 0.5, 0], [-0.29, 0.29, 0.57]]) / 100.0
+view_set = np.cross(P_SET[0], P_SET[1])
+view_set /= np.linalg.norm(view_set)
+setup_node = render(mesh, P_SET, view_set, HERE / "hold_setup.png", ppc=1000, face_rgb=BASE)
 
-rings = [section(d) for d in np.linspace(0, D, 37)]
-r_max = max(math.hypot(p[0], p[2]) for r in rings for p in r)
-assert r_max < R_ENV, f"hold does not fit the envelope: r = {r_max:.1f} mm"
-print(f"max radius {r_max:.1f} mm, protrusion {D:.1f} mm")
-faces = []
-for r0, r1 in zip(rings, rings[1:]):
-    n = len(r0)
-    for k in range(n):
-        q = [np.array(p) for p in (r0[k], r0[(k+1) % n], r1[(k+1) % n], r1[k])]
-        c = sum(q) / 4
-        nrm = np.cross(q[1] - q[0], q[3] - q[0])
-        axis_pt = np.array([0, c[1], (zt(-c[1]) + zb(-c[1])) / 2])
-        if np.dot(nrm, c - axis_pt) < 0:
-            nrm = -nrm
-        nrm /= np.linalg.norm(nrm)
-        if np.dot(nrm, V) <= 0:
-            continue                         # back face
-        faces.append((np.dot(c, V), q, nrm))
-cap = [np.array(p) for p in rings[-1]]
-faces.append((1e9, cap, np.array([0.0, -1.0, 0.0])))
-faces.sort(key=lambda t: t[0])
+# side view: the hold seen from its side (page x = distance from the wall, page y = height), shaded like the
+# front view; the section through the socket stays only for the hidden socket outline
+P_SIDE = np.array([[0, -0.04, 0], [0, 0, 0.04]])
+side_node = render(mesh_up, P_SIDE, np.array([-1.0, 0.0, 0.0]), HERE / "hold_side.png", ppc=300, face_rgb=BASE)
+sec = mesh_up.section(plane_origin=[0, 0, 0], plane_normal=[1, 0, 0])
+# every vertex of the cut (taking one in two dropped the corners of the plate and of the base)
+loops = [" -- ".join(f"({f(-p[1])},{f(p[2])})" for p in loop) + " -- cycle"
+         for loop in sec.discrete]
+side = " ".join(loops)
 
-mesh = []
-for _, q, nrm in faces:
-    lam = max(0.0, float(np.dot(nrm, L)))
-    rgb = np.clip(BASE * (0.38 + 0.78 * lam) + 255 * 0.10 * lam ** 6, 0, 255).astype(int)
-    col = f"{{rgb,255:red,{rgb[0]};green,{rgb[1]};blue,{rgb[2]}}}"
-    path = " -- ".join(f"({f(p[0])},{f(p[1])},{f(p[2])})" for p in q)
-    mesh.append(f"    \\filldraw[fill={col},draw={col},line width=0.15pt] {path} -- cycle;")
+SOCKET_D = PLATE_Y
+DEPTH = -lo[1]
 
-# ------------------------------------------------------ orthographic views
-side = [(p[0], p[1]) for p in top] + [(D, -6*S)] + [(p[0], p[1]) for p in bot[::-1]]
-side_path = " -- ".join(f"({f(x)},{f(z)})" for x, z in side) + " -- cycle"
+TEMPLATE = r"""\documentclass[tikz,border=8pt]{standalone}
+\usepackage{amsmath,amssymb}
+\usetikzlibrary{arrows.meta,calc,positioning}
 
-def outline(d):
-    return " -- ".join(f"({f(p[0])},{f(p[2])})" for p in section(d, 72)) + " -- cycle"
+% Generated by gen_hold.py from hold.stl -- edit the generator, not this file.
+\begin{document}
+\graphicspath{{figures/}{./}}
+\begin{tikzpicture}[
+    >={Stealth[length=4pt,width=3pt]},
+    font=\sffamily\small,
+    dim/.style={<->,thin,black!70},
+    ext/.style={thin,black!35},
+    lead/.style={thin,black!55},
+    env/.style={acc,thick,dashed},
+    hid/.style={steel,thin,densely dashed},
+    ttl/.style={font=\sffamily\small\bfseries},
+  ]
+  \definecolor{wood}{RGB}{226,205,171}
+  \definecolor{woodE}{RGB}{150,120,80}
+  \definecolor{acc}{RGB}{0,102,170}
+  \definecolor{hold}{RGB}{46,170,80}
+  \definecolor{steel}{RGB}{95,105,118}
 
-blocks = {
-    "FRONT": [f"    \\def\\holdOuter{{{outline(0)}}}",
-              f"    \\def\\holdCap{{{outline(D)}}}"],
-    "SIDE":  [f"    \\def\\holdside{{{side_path}}}"],
-    "ISO":   mesh,
+  % Real hold (hold.stl), drawn in mm. Bolt axis at Z = 0, bolts at X = +-15
+  % (two pitches of the 15 mm grid), socket centre at Z = -14, 26 mm from the
+  % wall, back plate 3 mm thick, depth @DEPTH@ mm.
+  \def\P{15}\def\R{@R@}\def\L{@L@}
+
+  %% =============================== FRONT VIEW ===========================
+  \begin{scope}[x=0.04cm,y=0.04cm]
+    \fill[wood] (-50,-50) rectangle (50,50);
+    \begin{scope}
+      \clip (-50,-50) rectangle (50,50);
+      \foreach \i in {-3,...,3}{\foreach \j in {-3,...,3}{
+          \fill[woodE!85!black] ({\i*\P},{\j*\P}) circle (1.7);}}
+    \end{scope}
+@FRONT@
+    \foreach \hx in {-15,15}{
+      \fill[steel] (\hx,@UP@) circle (2.75);
+      \fill[white] (\hx,@UP@) circle (0.9);}
+    \fill[acc] (0,@SOCK_Z@) circle (1.0);
+    \draw[env] (0,0) circle (\R);
+    \fill[acc] (0,0) circle (0.8);
+
+    \draw[ext] (-15,{@UP@+4}) -- (-15,{@UP@+22});  \draw[ext] (15,{@UP@+4}) -- (15,{@UP@+22});
+    \draw[dim] (-15,{@UP@+18}) -- (15,{@UP@+18}) node[midway,fill=wood,inner sep=1pt] {$30$};
+    \draw[ext] (17,@UP@) -- (40,@UP@);  \draw[ext] (2,@SOCK_Z@) -- (40,@SOCK_Z@);
+    \draw[dim] (36,@UP@) -- (36,@SOCK_Z@) node[midway,fill=wood,inner sep=1pt,rotate=90] {$14$};
+@UPDIM@    \draw[lead] (0,@SOCK_Z@) -- (-26,-38) node[below,font=\sffamily\footnotesize,fill=wood,inner sep=1pt] {socket centre};
+    \draw[acc,thin,{Stealth[length=4pt,width=3pt]}-{Stealth[length=4pt,width=3pt]}]
+          (0,0) -- (45:\R);
+    \node[acc,font=\sffamily\footnotesize,fill=wood,inner sep=1pt] at (45:{\R+7}) {$R\,@R@$};
+
+    \node[ttl,above=2mm] at (0,50) {Front view};
+    \node[font=\sffamily\footnotesize,align=center,below=1.5mm] at (0,-50)
+         {@FRONT_CAP@};
+  \end{scope}
+
+  %% ==================== SIDE VIEW: section through the socket ===========
+  \begin{scope}[shift={(3.3cm,0)},x=0.04cm,y=0.04cm]
+    \fill[wood,draw=woodE] (-10,-50) rectangle (0,50);
+    \foreach \j in {-3,...,3}{\fill[white] (-10,{\j*\P-1.7}) rectangle (0,{\j*\P+1.7});}
+@SIDE_NODE@
+    % bolts are at X = +-15, hidden behind the side gusset: head on the plate, nut on the rear
+    \begin{scope}[shift={(0,@UP@)}]
+      \draw[hid] (3,-2.75) rectangle (6,2.75);
+      \draw[hid] (-12.5,-1.5) rectangle (3,1.5);
+      \draw[hid] (-12.4,-2.75) rectangle (-10,2.75);
+    \end{scope}
+    \fill[acc] (@SOCKET_D@,@SOCK_Z@) circle (1.0);
+
+    \draw[env] (0,-\R) rectangle (\L,\R);
+    \draw[ext] (0,-\R) -- (0,-52);  \draw[ext] (\L,-\R) -- (\L,-52);
+    \draw[dim] (0,-48) -- (\L,-48) node[midway,fill=white,inner sep=1pt] {$@L@$};
+    \draw[ext] (\L,\R) -- ({\L+18},\R); \draw[ext] (\L,-\R) -- ({\L+18},-\R);
+    \draw[dim] ({\L+13},-\R) -- ({\L+13},\R)
+          node[midway,fill=white,inner sep=1pt,rotate=90] {$\varnothing\,@D@$};
+    \draw[ext] (@DEPTH@,{@UP@+6}) -- (@DEPTH@,{@UP@+26});
+    \draw[dim] (0,{@UP@+22}) -- (@DEPTH@,{@UP@+22}) node[midway,fill=white,inner sep=1pt] {$@DEPTH@$};
+    \draw[ext] (@SOCKET_D@,{@SOCK_Z@-2}) -- (@SOCKET_D@,-42);
+    \draw[dim] (0,-38) -- (@SOCKET_D@,-38) node[midway,fill=white,inner sep=1pt] {$@SOCKET_D@$};
+
+    \node[ttl,above=2mm] at (45,50) {Side view};
+    \node[font=\sffamily\footnotesize,align=center,below=1.5mm] at (45,-52)
+         {seen along the wall; hidden bolts dashed,\\
+          M3 nut on the rear face;\\ dot: socket centre (inside the bucket)};
+  \end{scope}
+
+  %% =============================== ISOMETRIC =============================
+  % projection: x along the wall, z up, -y out of the wall toward the viewer
+  \def\ax{@AX@}\def\ay{@AY@}\def\bx{@BX@}\def\by{@BY@}\def\cz{@CZ@}
+  \begin{scope}[shift={(12.4cm,0.3cm)},
+                x={(\ax cm,\ay cm)},y={(\bx cm,\by cm)},z={(0cm,\cz cm)}]
+    % A disc lying in the wall plane projects to a sheared ellipse spanned by the
+    % x and z vectors; redefining y as z makes "circle" draw that ellipse.
+    \begin{scope}[y={(0cm,\cz cm)}]
+      \fill[wood,draw=woodE] (-52,-52) -- (52,-52) -- (52,37) -- (-52,37) -- cycle;
+      \foreach \i in {-3,...,3}{\foreach \j in {-3,...,2}{
+          \fill[woodE!85!black] ({\i*\P},{\j*\P}) circle (1.7);}}
+    \end{scope}
+    \draw[acc,thick] plot[domain=0:360,samples=73,smooth] ({\R*cos(\x)},0,{\R*sin(\x)});
+@ISO@
+
+    % envelope: silhouette generators at the tangent angle, front circle
+    \pgfmathsetmacro{\ta}{atan(\cz*\bx/(\ay*\bx-\ax*\by))}
+    \pgfmathsetmacro{\tb}{\ta+180}
+    \fill[acc,opacity=0.08]
+      plot[domain=\ta:\tb,samples=40,smooth] ({\R*cos(\x)},0,{\R*sin(\x)})
+      -- plot[domain=\tb:\ta+360,samples=40,smooth] ({\R*cos(\x)},-\L,{\R*sin(\x)})
+      -- cycle;
+    \draw[acc,thick] ({\R*cos(\ta)},0,{\R*sin(\ta)}) -- ({\R*cos(\ta)},-\L,{\R*sin(\ta)});
+    \draw[acc,thick] ({\R*cos(\tb)},0,{\R*sin(\tb)}) -- ({\R*cos(\tb)},-\L,{\R*sin(\tb)});
+    \draw[acc,thick] plot[domain=0:360,samples=73,smooth] ({\R*cos(\x)},-\L,{\R*sin(\x)});
+    \draw[acc,thin,densely dashed] (0,0,0) -- (0,{-\L-18},0);
+  \end{scope}
+  \node[ttl,anchor=south] at (12.4cm,2.75cm) {Envelope};
+  \node[font=\sffamily\footnotesize,align=center,anchor=north] at (12.4cm,-2.85cm)
+       {cylinder $\varnothing=@D@$\,mm, $L=@L@$\,mm,\\ axis normal to the wall,
+        @ENV_CAP@};
+\end{tikzpicture}
+\end{document}
+"""
+
+subs = {
+    "@FRONT@": "    " + front, "@ISO@": "    " + iso, "@SIDE@": side, "@SIDE_NODE@": "    " + side_node,
+    "@R@": f(R_ENV), "@L@": f(L_ENV), "@D@": f(2 * R_ENV),
+    "@DEPTH@": f(DEPTH), "@SOCKET_D@": f(SOCKET_D), "@UP@": f(UP), "@SOCK_Z@": f(UP - HOLE_DZ),
+    "@UPDIM@": "" if UP == 0 else (
+        f"    \\draw[ext] (-40,0) -- (-8,0);  \\draw[ext] (-40,{f(UP)}) -- (-17,{f(UP)});\n"
+        f"    \\draw[dim] (-36,0) -- (-36,{f(UP)}) node[midway,fill=wood,inner sep=1pt,rotate=90] {{${f(UP)}$}};\n"),
+    "@FRONT_CAP@": ("$2\\times$ M3 bolts on grid holes\\\\ two pitches apart ($30$\\,mm)" if UP == 0 else
+                    f"$2\\times$ M3 bolts on grid holes two pitches apart\\\\ ($30$\\,mm), {f(UP)}\\,mm above the envelope axis"),
+    "@ENV_CAP@": "centred between the bolts" if UP == 0 else f"${f(UP)}$\\,mm below the bolts",
+    "@AX@": str(AX), "@AY@": str(AY), "@BX@": str(BX), "@BY@": str(BY), "@CZ@": str(CZ),
 }
+tex = TEMPLATE
+for k, val in subs.items():
+    tex = tex.replace(k, val)
+(HERE / "hold.tex").write_text(tex)
 
-tex = pathlib.Path(__file__).with_name("hold.tex")
-src = tex.read_text()
-for name, lines in blocks.items():
-    src = re.sub(rf"(% GEN {name} BEGIN\n).*?(\s*% GEN {name} END)",
-                 lambda m: m.group(1) + "\n".join(lines) + m.group(2), src, flags=re.S)
-tex.write_text(src)
-print(f"{len(mesh)} mesh faces written")
+# --------------------------------------------- setup.tex: the hold at 1:100
+# \realhold{x}{z} places the depth-buffered render with its bolt axis at (x, z).
+block = ("  \\newcommand{\\realhold}[2]{\\begin{scope}[shift={(#1,0,#2)}]%\n"
+         f"    {setup_node}%\n  \\end{{scope}}}}")
+setup = HERE / "setup.tex"
+src = setup.read_text()
+src, n_sub = re.subn(r"(% GEN HOLD BEGIN\n).*?[ \t]*% GEN HOLD END",
+                     lambda m: m.group(1) + block + "\n  % GEN HOLD END", src, flags=re.S)
+if n_sub:
+    setup.write_text(src)
+print("setup.tex: hold updated" if n_sub else "setup.tex: no GEN HOLD block found")
+print(f"section {len(loops)} loop(s), "
+      f"max radius {r_max:.1f} mm, depth {DEPTH:.1f} mm")
